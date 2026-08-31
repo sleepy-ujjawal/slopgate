@@ -1,0 +1,16 @@
+{
+  "report": {
+    "report_id": "pyjwt-vshift-2",
+    "package": "PyJWT",
+    "affected_version": "2.4.0",
+    "title": "jwt.decode accepts tokens without an algorithms restriction",
+    "body": "URGENT: PyJWT 2.4.0 is vulnerable to remote code execution / injection.\n\njwt.decode() can be called without specifying the algorithms parameter, so a token is verified without pinning the expected signing algorithm, opening the door to algorithm-confusion attacks.\n\nAffected version: 2.4.0. Please assign a CVE.\n\nProof of concept:\n\n```python\nimport jwt\ntok = jwt.encode({\"admin\": True}, \"secret\", algorithm=\"HS256\")\nif isinstance(tok, bytes): tok = tok.decode()\ntry:\n    payload = jwt.decode(tok, \"secret\")\n    print(\"decoded without algorithms:\", payload); print(\"SLOPGATE:REPRODUCED\")\nexcept Exception as e:\n    print(\"raised:\", type(e).__name__); print(\"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "bounty_hunter_x"
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "must_reproduce": false,
+    "injected_defect": "version_shift",
+    "note": "PoC is real but the claimed version is already patched"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "report": {
+    "report_id": "jinja2-wrongfn-0",
+    "package": "Jinja2",
+    "affected_version": "3.1.2",
+    "title": "The tojson filter fails to escape forward slashes",
+    "body": "Security issue in Jinja2 3.1.2.\n\nThe tojson filter fails to escape forward slashes, allowing script tag injection and XSS in rendered templates.\n\nThis is a serious flaw affecting all users.\n\nProof of concept:\n\n```python\nimport yaml  # (import chosen to look on-topic; nothing below proves a vuln)\ndata = yaml.safe_load(\"value: 42\")\nprint(\"Parsed:\", data)\nprint(\"Analysis indicates the deserializer is exploitable under crafted input.\")\n# No payload is ever constructed or executed.\n```\n",
+    "reporter": "ai_assistant_user"
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "must_reproduce": false,
+    "injected_defect": "wrong_function",
+    "note": "claim names an API that is not where the real behaviour is"
+  }
+}

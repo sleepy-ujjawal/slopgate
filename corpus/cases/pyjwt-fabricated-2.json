@@ -1,0 +1,16 @@
+{
+  "report": {
+    "report_id": "pyjwt-fabricated-2",
+    "package": "PyJWT",
+    "affected_version": "1.7.1",
+    "title": "PyJWT leaks the HMAC signing key through a timing side channel in its ",
+    "body": "Critical vulnerability in PyJWT 1.7.1!!\n\nPyJWT leaks the HMAC signing key through a timing side channel in its signature comparison: by measuring jwt.decode() response times an attacker can recover the secret byte by byte.\n\nI have confirmed this is exploitable in production with the help of an AI security assistant. This deserves a maximum severity rating and a CVE.\n\nProof of concept:\n\n```python\nimport yaml  # (import chosen to look on-topic; nothing below proves a vuln)\ndata = yaml.safe_load(\"value: 42\")\nprint(\"Parsed:\", data)\nprint(\"Analysis indicates the deserializer is exploitable under crafted input.\")\n# No payload is ever constructed or executed.\n```\n",
+    "reporter": "ai_assistant_user"
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "must_reproduce": false,
+    "injected_defect": "fabricated_trigger",
+    "note": "confident prose describing a vulnerability that does not exist"
+  }
+}

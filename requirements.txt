@@ -1,0 +1,11 @@
+# Host-side dependencies: NONE beyond the Python standard library.
+# SlopGate deliberately uses only stdlib (urllib, json, subprocess, dataclasses,
+# concurrent.futures) so a judge can reproduce it without a dependency resolver.
+#
+# External requirements:
+#   * Python 3.9+
+#   * Docker (for the reproduction sandbox)
+#   * A Google AI Studio API key in .env as GEMINI_API_KEY
+#
+# The sandbox image installs the pinned vulnerable packages itself at build time;
+# see corpus/environments.tsv and the Dockerfile.
