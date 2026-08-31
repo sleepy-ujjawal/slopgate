@@ -58,7 +58,7 @@ def resolve_env(package: str, version: str) -> Optional[str]:
 def run_reproduction(
     trajectory: Trajectory, *, agent: str, env_id: str, poc_code: str
 ) -> ReproResult:
-    """Execute a PoC in the sandbox and record the attempt on the trajectory."""
+    """Execute a PoC in a pre-baked sandbox env and record it on the trajectory."""
     result = attempt_reproduction(env_id, poc_code)
     trajectory.tool_call(
         agent=agent,
@@ -67,6 +67,36 @@ def run_reproduction(
         result={
             "outcome": result.outcome,
             "exit_code": result.exit_code,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "command": result.command,
+        },
+    )
+    return result
+
+
+def reproduce_auto(
+    trajectory: Trajectory, *, agent: str, package: str, version: str, poc_code: str
+):
+    """Reproduce against (package, version), pre-baked if available else dynamic.
+
+    Returns an object exposing .outcome, .stdout, .command and
+    .confirms_vulnerability() — both ReproResult and DynamicResult qualify — so
+    the same agent code works on the fixed corpus and on arbitrary real packages.
+    """
+    env = resolve_env(package, version)
+    if env:
+        return run_reproduction(trajectory, agent=agent, env_id=env, poc_code=poc_code)
+
+    # Not pre-baked: provision the real package on demand.
+    from slopgate.sandbox.dynamic import attempt_reproduction_dynamic
+    result = attempt_reproduction_dynamic(package, version, poc_code)
+    trajectory.tool_call(
+        agent=agent,
+        tool="attempt_reproduction",
+        args={"package": package, "version": version, "mode": "dynamic", "poc_code": poc_code},
+        result={
+            "outcome": result.outcome,
             "stdout": result.stdout,
             "stderr": result.stderr,
             "command": result.command,

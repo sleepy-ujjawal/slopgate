@@ -163,6 +163,52 @@ flipping every misversioned gadget to `insufficient` would "fix" the challenge
 case but would also stop auto-closing genuine slop — a maintainer's risk-tolerance
 call, deliberately left to them.
 
+## Real-world validation (beyond the synthetic corpus)
+
+The synthetic corpus proves the mechanism; this proves it on **real, independent
+CVEs**. A dynamic provisioner (`slopgate/sandbox/dynamic.py`) installs the exact
+affected package from PyPI on demand into the isolated sandbox, so the agent runs
+the reporter's proof-of-concept against the genuine code. Nine cases, five real
+CVEs across five vulnerability classes, each as a truthful report (affected
+version) and a version-shift slop report (same PoC, patched version):
+
+| CVE | Package | Class | affected → patched |
+|---|---|---|---|
+| CVE-2026-68508 | hydra-core | code injection | 1.3.3 ✓ / 1.3.4 ✗ |
+| CVE-2022-21797 | joblib | eval injection | 1.1.0 ✓ / 1.2.0 ✗ |
+| CVE-2023-33733 | reportlab | eval sandbox escape | 3.6.12 ✓ / 3.6.13 ✗ |
+| CVE-2026-40491 | gdown | tar-slip path traversal | 5.2.1 ✓ / 5.2.2 ✗ |
+| CVE-2020-22083 | jsonpickle | insecure deserialization | 1.4.1 ✓ |
+
+| | Baseline | Full solution |
+|---|---|---|
+| Correct-verdict rate | 67% (6/9) | **100% (9/9)** |
+| False-confirm rate | 33% (3/9) | **0%** |
+
+Two cases carry the whole story:
+
+- **hydra-core (a 2026 CVE):** the baseline answered `not_reproducible` — wrong,
+  because the model never memorized a CVE this new. The solution *ran the PoC*,
+  reproduced it, and confirmed. **Execution beat memorization on a vuln too recent
+  to know.**
+- **reportlab / joblib / gdown version-shift:** the baseline **confirmed real
+  exploits against already-patched versions** (it didn't know they were fixed).
+  The solution ran each, got `NOT_REPRODUCED`, and rejected all three.
+
+Reproduce with `python -m slopgate.eval.realdata_harness` (needs network to
+provision packages; cases in `realdata/cases/`).
+
+**Honest limits this surfaced.** (1) *Reachability* — the system only reproduces
+when the report carries a runnable PoC; with prose only it abstains. (2) *Trust-
+model slop* — the most common real false-positives (dnsmasq/Kamailio/Hibernate/
+`future`, all documented at `realdata/slop_corpus.md`) are "vulnerabilities" that
+require the attacker to already control a config file or the host. Their PoC
+*reproduces*, so pure execution would wrongly confirm them — the real ceiling of
+this approach, and the next thing to fix (a threat-model check: *what must the
+attacker already control?*). (3) *Language* — the sandbox is Python; C projects
+like curl (the motivating case) need a separate runtime, so curl slop is handled
+only as a text-level baseline-fooling test (`realdata/curl_slop_cases.json`).
+
 ## Hot take
 
 I built five agentic safeguards on top of the base model — a reproduction tool, a

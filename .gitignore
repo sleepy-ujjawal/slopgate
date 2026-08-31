@@ -10,3 +10,10 @@ __pycache__/
 
 # harness internal
 .claude-tracker/
+
+# real-data working files (bulk pulls, provisioning cache, broad exploit dump)
+realdata/envcache/
+realdata/adv1.json
+realdata/adv2.json
+realdata/candidates.json
+realdata/pocs/

