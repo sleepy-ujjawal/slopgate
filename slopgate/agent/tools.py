@@ -76,29 +76,37 @@ def run_reproduction(
 
 
 def reproduce_auto(
-    trajectory: Trajectory, *, agent: str, package: str, version: str, poc_code: str
+    trajectory: Trajectory, *, agent: str, package: str, version: str, poc_code: str,
+    ecosystem: str = "python",
 ):
-    """Reproduce against (package, version), pre-baked if available else dynamic.
+    """Reproduce against (ecosystem, package, version), routing to the right runtime.
 
     Returns an object exposing .outcome, .stdout, .command and
-    .confirms_vulnerability() — both ReproResult and DynamicResult qualify — so
-    the same agent code works on the fixed corpus and on arbitrary real packages.
+    .confirms_vulnerability() — ReproResult, DynamicResult and RunResult all
+    qualify — so the same agent code works on the fixed corpus, on arbitrary real
+    PyPI packages, and (via the C runtime) on non-Python targets.
     """
-    env = resolve_env(package, version)
-    if env:
-        return run_reproduction(trajectory, agent=agent, env_id=env, poc_code=poc_code)
+    if ecosystem == "python":
+        env = resolve_env(package, version)
+        if env:
+            return run_reproduction(trajectory, agent=agent, env_id=env, poc_code=poc_code)
+        from slopgate.sandbox.dynamic import attempt_reproduction_dynamic
+        result = attempt_reproduction_dynamic(package, version, poc_code)
+    else:
+        # non-Python target: dispatch to the language-pluggable runtime
+        from slopgate.sandbox.base import get_runtime, Target
+        runtime = get_runtime(ecosystem)
+        result = runtime.reproduce(Target(ecosystem, package, version), poc_code)
 
-    # Not pre-baked: provision the real package on demand.
-    from slopgate.sandbox.dynamic import attempt_reproduction_dynamic
-    result = attempt_reproduction_dynamic(package, version, poc_code)
     trajectory.tool_call(
         agent=agent,
         tool="attempt_reproduction",
-        args={"package": package, "version": version, "mode": "dynamic", "poc_code": poc_code},
+        args={"ecosystem": ecosystem, "package": package, "version": version,
+              "mode": "dynamic", "poc_code": poc_code},
         result={
             "outcome": result.outcome,
             "stdout": result.stdout,
-            "stderr": result.stderr,
+            "stderr": getattr(result, "stderr", ""),
             "command": result.command,
         },
     )

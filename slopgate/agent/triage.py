@@ -56,6 +56,9 @@ class TriageDraft:
     # version sweep: if the claim did not reproduce on the claimed version but the
     # same PoC reproduces on a sibling version, that env id is recorded here.
     sweep_hit_env: Optional[str] = None
+    # True when the PoC was authored by the agent (no reporter PoC in the report),
+    # which triggers the stricter demonstrates-claim re-verify downstream.
+    poc_synthesized: bool = False
 
 
 def _extract_poc(report_body: str) -> Optional[str]:
@@ -66,19 +69,24 @@ def _extract_poc(report_body: str) -> Optional[str]:
     actually looks like a runnable script — one carrying the SLOPGATE marker or
     an import — over the first fence we happen to find.
     """
-    # Prefer python-tagged fences: an advisory often shows an untagged config
-    # snippet whose closing ``` would otherwise mis-pair with the PoC's fence.
-    py = re.findall(r"```python\s*\n(.*?)```", report_body, re.DOTALL)
-    marked = [b for b in py if "SLOPGATE:" in b or "import " in b]
-    if marked:
-        return marked[-1]
-    if py:
-        return py[-1]
-    anyb = re.findall(r"```\s*\n(.*?)```", report_body, re.DOTALL)
-    marked = [b for b in anyb if "SLOPGATE:" in b or "import " in b]
-    if marked:
-        return marked[-1]
-    return anyb[-1] if anyb else None
+    # Match any language-tagged fence (```python, ```c, or bare ```). An advisory
+    # often shows an untagged config snippet too, so prefer the block that looks
+    # like a runnable PoC: the marker, or a code tell (import / #include / main).
+    blocks = re.findall(r"```[A-Za-z0-9_+-]*\s*\n(.*?)```", report_body, re.DOTALL)
+    if not blocks:
+        return None
+    for b in blocks:
+        if "SLOPGATE:" in b:
+            return b
+    for b in blocks:
+        if _looks_runnable(b):
+            return b
+    return blocks[-1]
+
+
+def _looks_runnable(code: str) -> bool:
+    return ("SLOPGATE:" in code or "import " in code or "#include" in code
+            or "int main" in code)
 
 
 def _plan_prompt(report: Report, envs: list[str], resolved: Optional[str]) -> str:
@@ -126,35 +134,45 @@ def run_triage(report: Report, trajectory: Trajectory) -> TriageDraft:
     plan = plan or {}
     claims = [str(c) for c in (plan.get("claims") or [])]
     env_id = plan.get("env_id") or resolved
-    # Real triage verifies the PoC the reporter supplied; only if the report
-    # carries no runnable PoC does the agent fall back to authoring one.
+    # Real triage verifies the PoC the reporter supplied. Only if the report
+    # carries no runnable PoC does the agent author one — via a bounded
+    # write/run/fix synthesis loop (prose-to-PoC), flagged for stricter checking.
     embedded = _extract_poc(report.body)
-    poc = embedded if (embedded and "SLOPGATE:" in embedded) else (plan.get("poc") or embedded)
 
-    # Step 3: actually run it. reproduce_auto uses a pre-baked env when the
-    # (package, version) is in the corpus, and otherwise provisions the real
-    # package from PyPI on demand — so the same agent works on real advisories.
     reproduced = False
     outcome = "NO_POC"
     stdout = ""
     command = ""
-    display_env = env_id or (f"{report.package}=={report.affected_version} (dynamic)"
-                             if poc else None)
-    if poc:
+    poc = None
+    poc_synthesized = False
+
+    # Use the reporter's PoC when the report ships a runnable one (a marker for
+    # Python, or C source that ASAN will judge). Only synthesize when there is none.
+    if embedded and _looks_runnable(embedded):
+        poc = embedded
         result = reproduce_auto(trajectory, agent=AGENT, package=report.package,
-                                version=report.affected_version, poc_code=poc)
+                                version=report.affected_version, poc_code=poc,
+                                ecosystem=report.ecosystem)
         reproduced = result.confirms_vulnerability()
         outcome, stdout, command = result.outcome, result.stdout, result.command
-        env_id = display_env
     else:
-        trajectory.note(agent=AGENT, message="could not run a reproduction (no PoC)",
-                        data={"resolved_env": resolved})
+        from slopgate.agent.synthesize import synthesize_and_run
+        trajectory.note(agent=AGENT, message="no PoC in report; synthesizing one")
+        sr = synthesize_and_run(report, report.ecosystem, trajectory)
+        poc = sr.poc
+        poc_synthesized = True
+        reproduced = sr.reproduced
+        outcome, stdout, command = sr.outcome, sr.stdout, sr.command
+
+    env_id = env_id or (f"{report.package}=={report.affected_version} "
+                        f"({report.ecosystem})" if poc else None)
 
     # Version sweep: a real gadget that fails on the claimed version may still
     # reproduce on a sibling. Distinguishing "real bug, wrong version" from "empty
     # claim" is diagnostic the memo should carry, so try the PoC on siblings.
     sweep_hit = None
-    if poc and outcome == "NOT_REPRODUCED" and env_id:
+    if (poc and not poc_synthesized and report.ecosystem == "python"
+            and outcome == "NOT_REPRODUCED" and env_id):
         for sibling in sibling_envs(report.package, exclude=env_id):
             probe = run_reproduction(trajectory, agent=AGENT, env_id=sibling, poc_code=poc)
             if probe.confirms_vulnerability():
@@ -175,5 +193,5 @@ def run_triage(report: Report, trajectory: Trajectory) -> TriageDraft:
         proposed_verdict=proposed, summary=summary, claims=claims,
         poc_used=poc, env_id=env_id, reproduced=reproduced,
         repro_outcome=outcome, repro_stdout=stdout, repro_command=command,
-        sweep_hit_env=sweep_hit,
+        sweep_hit_env=sweep_hit, poc_synthesized=poc_synthesized,
     )

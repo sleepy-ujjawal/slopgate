@@ -1,0 +1,18 @@
+{
+  "report": {
+    "report_id": "gdown-prose",
+    "package": "gdown",
+    "affected_version": "5.2.1",
+    "title": "path traversal in gdown extractall",
+    "body": "I found a tar-slip path traversal in gdown 5.2.1. gdown.extractall does not validate archive member paths, so a crafted tar can write outside the target directory.\n\nTracked as CVE-2026-40491.\n\n(No PoC included; please verify.)",
+    "reporter": "researcher"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "package": "gdown",
+    "fixed_version": "5.2.2",
+    "cve": "CVE-2026-40491",
+    "source": "GHSA",
+    "note": "real, affected"
+  }
+}

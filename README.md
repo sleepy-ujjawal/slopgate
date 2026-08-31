@@ -241,6 +241,43 @@ more aggressive version over-rejected hydra-core and joblib by latching onto
 already own the filesystem" case. That tuning is the difference between a gate that
 closes the gap and one that discards real bugs.
 
+## v2 — closing the last two gaps
+
+### Prose-to-PoC (reachability)
+
+Real reports do not always ship a runnable PoC, and the agent used to abstain on
+prose alone. It now runs a **bounded synthesis loop**
+(`slopgate/agent/synthesize.py`): write a PoC → run it → read the error → fix →
+retry (≤3). A synthesized reproduction is not trusted on its own — a separate
+`demonstrates_claim` pass must confirm the PoC exercises the **claimed** impact
+(not just prints the marker) before the confirmation stands, and the threat-model
+gate still applies. Validated: on a real advisory with its PoC block removed
+(`prose-gdown`), the agent synthesized a working tar-slip PoC on the first attempt
+and reached `confirmed` — where the pre-v2 system abstained.
+
+### Language-pluggable runtime + C/ASAN (curl)
+
+The sandbox is no longer Python-only. `slopgate/sandbox/base.py` defines a
+`Runtime` seam with `get_runtime(ecosystem)`; the Python path keeps its dynamic
+provisioner, and a new **C runtime** (`slopgate/sandbox/c_runtime.py`) compiles a
+PoC with `-fsanitize=address` in a gcc image — a real memory bug aborts with an
+ASAN signature (→ REPRODUCED), a fabricated one runs clean (→ NOT_REPRODUCED).
+This finally lets curl (C) be handled by execution, not just text.
+
+Validated on real cases:
+- **`c-real-overflow`** (a genuine stack-buffer-overflow) → ASAN fires → `confirmed`.
+- **`curl-websocket-slop` / `curl-telnet-slop`** (real HackerOne AI-slop from
+  Stenberg's list) → **neither confirmed** (0 false-confirms): one ran a
+  synthesized C PoC that stayed clean under ASAN → `not_reproducible`; the other
+  honestly **abstained** (`insufficient`) because a libcurl-*internal* claim
+  cannot be proven with a self-contained PoC.
+
+**Honest limit that remains:** the generic C runner proves memory corruption on
+**self-contained** PoCs; claims about a library's internal code path (much of the
+real curl slop) are not fully reachable this way, so abstention — not a confident
+verdict — is the correct outcome there. Per-version libcurl builds would close
+that, at the cost of a much heavier harness.
+
 ## Hot take
 
 I built five agentic safeguards on top of the base model — a reproduction tool, a

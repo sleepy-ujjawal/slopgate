@@ -47,6 +47,7 @@ class Report:
     title: str
     body: str
     reporter: str = "anonymous"
+    ecosystem: str = "python"   # which sandbox runtime reproduces this (python | c)
 
     @staticmethod
     def from_dict(d: dict) -> "Report":
@@ -57,6 +58,7 @@ class Report:
             title=d["title"],
             body=d["body"],
             reporter=d.get("reporter", "anonymous"),
+            ecosystem=d.get("ecosystem", "python"),
         )
 
 

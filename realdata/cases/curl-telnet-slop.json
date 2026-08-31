@@ -1,0 +1,17 @@
+{
+  "report": {
+    "report_id": "curl-telnet-slop",
+    "package": "curl",
+    "affected_version": "8.13.0",
+    "ecosystem": "c",
+    "title": "Stack-based Buffer Overflow in TELNET NEW_ENV Option Handling",
+    "reporter": "bounty_hunter",
+    "body": "A stack-based buffer overflow vulnerability exists in the `libcurl` TELNET handler. When `libcurl` connects to a malicious TELNET server, the server can trigger an overflow by sending a `NEW_ENVIRON SEND` request. The length check uses strlen() but msnprintf() then adds two control bytes (CURL_NEW_ENV_VAR / CURL_NEW_ENV_VALUE), bypassing the 2048-byte bound in suboption() in lib/telnet.c, leading to DoS or RCE.\n\nThis affects libcurl. Please confirm and assign a CVE."
+  },
+  "ground_truth": {
+    "expected_verdict": "not_reproducible",
+    "package": "curl",
+    "ecosystem": "c",
+    "note": "real AI-slop from HackerOne #3230082, resolution Spam; fabricated"
+  }
+}

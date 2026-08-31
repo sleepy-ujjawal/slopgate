@@ -123,6 +123,17 @@ def run_pipeline(report: Report, stage: str, trajectory: Trajectory) -> TriageMe
                 verdict = outcome.verdict
                 abstentions.append("Confirmation revised down after adversarial review.")
 
+    # synthesized-PoC strict re-verify: a self-authored PoC (no reporter PoC) must
+    # actually demonstrate the claimed impact, not merely print the success marker.
+    if stage == "challenge" and verdict == Verdict.CONFIRMED and draft.poc_synthesized:
+        from slopgate.agent.synthesize import demonstrates_claim
+        if not demonstrates_claim(report, draft.poc_used or "", draft.repro_outcome or "",
+                                  draft.repro_stdout, trajectory):
+            verdict = Verdict.INSUFFICIENT
+            abstentions.append(
+                "The reproduction used an agent-synthesized PoC that did not clearly "
+                "demonstrate the claimed impact; a human should verify the finding.")
+
     # threat-model gate: a reproduction that requires an attacker-controlled
     # trusted resource is trust-model confusion, not a vulnerability.
     if stage == "challenge" and verdict == Verdict.CONFIRMED:
