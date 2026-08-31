@@ -278,6 +278,92 @@ real curl slop) are not fully reachable this way, so abstention — not a confid
 verdict — is the correct outcome there. Per-version libcurl builds would close
 that, at the cost of a much heavier harness.
 
+## v3 — turning two enterprise-review blockers into running code
+
+A product team proposed taking SlopGate to an enterprise gate (static reachability
+suppression + a slopsquat blocker). A day-100 pre-mortem left **two Sprint-1
+blockers**; both are now demonstrated as honest, prototype-scale mechanisms — real
+static analysis and real live-PyPI calls, not the aspirational Firecracker/OpenVEX
+stack.
+
+### R1 — a reachability slicer whose soundness bias lives in the *scanner*
+
+The enterprise design suppressed an advisory as `not_affected` when a static slicer
+marked the vulnerable symbol `UNREACHABLE_STRICT`. Its stated rule was "default to
+ambiguous," but its *escalation* was a **denylist match** against an enumerated
+registry — so any dynamic construct the registry forgot fell straight through to a
+signed `not_affected`. That is failing *open* on the unknown.
+
+`slopgate/reach/slicer.py` inverts it. It recognises a **whitelist of statically-
+modelable AST node types**; ANY node outside it — a construct the analyzer doesn't
+model, a future language feature, an unparseable file — forces `DYNAMIC_AMBIGUOUS`.
+The denylist of known-dynamic constructs still exists, but only as an *optimization*
+that yields a precise reason; a gap in it costs **noise** (a spurious AMBIGUOUS),
+never a false STRICT. The headline metric is therefore **soundness violations = 0**:
+
+```
+python -m slopgate.reach.eval     # 12/12 classified, 0 soundness violations
+```
+
+The load-bearing case is `unmodeled_match`: a `match` statement is a real, post-3.10
+construct a slicer (or registry) written earlier would not model. A denylist that
+never listed it suppresses to STRICT; the fail-closed scanner escalates to AMBIGUOUS
+instead (on Python < 3.10 the same source fails to parse and takes the parse-fail
+path to AMBIGUOUS — either way, never STRICT). It is standalone and advisory-only: a
+report carries no consuming repo to slice, so this proves the *mechanism*, and never
+auto-suppresses — consistent with "the customer signs, suppression is deterministic."
+
+**At scale** (`python -m slopgate.reach.eval_scale`, 4,000 real stdlib + site-packages
+files, no network): **0 crashes, 0 soundness violations**. All **2,932** genuinely-
+referenced symbols classified `REACHABLE_CONFIRMED`; on an absent symbol the split was
+60% `STRICT` / 40% `AMBIGUOUS` / **0% falsely reachable** — it escalates exactly when a
+file's dynamic/unmodeled constructs block a strict proof, and never signs a false
+STRICT on a symbol that is actually used.
+
+### R2 — a name-slop classifier that is warn-only until its FP rate is measured
+
+The enterprise slopsquat gate keyed on Levenshtein distance — i.e. **typosquatting**,
+not the AI-hallucination threat the product is named for: an LLM inventing a plausible
+*compound* name (`langchain-chroma-retriever`) that isn't a typo of anything. And it
+proposed to **synchronously block** on an unmeasured threshold, over vectors that
+also fingerprint legitimate young packages.
+
+`slopgate/slop/` scores the real threat — compound-name mimicry + temporal asymmetry
+(live PyPI age / absence) + provenance deficit — and is wired into the pipeline as a
+**warn-only advisory** (`TriageMemo.slop_advisory`) that records a note and **never
+changes the verdict**. The weights are set so the offline name-shape signal alone
+cannot cross the flag threshold; a name only flags when a live registry signal
+corroborates it. The deliverable is the measurement the review demanded before any
+block:
+
+```
+python -m slopgate.slop.eval      # live PyPI (cached): FP rate + recall
+```
+
+On the labeled corpus (`slopgate/slop/cases/`): **false-positive rate 0/12 (0%)**,
+**recall 10/10** on invented names. The honest detail that makes the point: real
+compound packages like `django-redis` and `langchain-chroma` score identically to
+slop on *name shape alone* (0.45) — only the live age/provenance signal pulls them
+below the threshold. And building the corpus surfaced that two names I'd assumed were
+invented (`flask-jwt-router`, `fastapi-auth-middleware`) are **real, ~4–7-year-old
+packages**; the classifier correctly refused to flag them, and they were relabeled as
+legitimate. A brand-new legit compound with missing provenance *would* score higher —
+which is exactly why it ships warn-only, not as a synchronous block.
+
+**At scale** (`python -m slopgate.slop.eval_scale`, live PyPI): **300 real
+compound-shaped packages → 0 false positives (0.00%)**; **300 genuinely-absent
+hallucination-shaped names → 100% recall** (of 900 generated names, 2 turned out to
+be already registered on PyPI — real or squatted). The honest caveat: the 300 real
+packages come from the top-PyPI list, so they are *established* (old + provenance) and
+score ≤0.45 by construction — this proves it never flags established real compounds,
+but does not stress *young* legit packages, which stay the real FP risk. That gap is
+the reason the classifier stays warn-only rather than blocking.
+
+Both mechanisms are guarded by the sandbox self-test
+(`python -m slopgate.sandbox.selftest`): a reachability check (including the
+unmodeled-construct-must-not-suppress invariant) and a network-free slop-classifier
+check.
+
 ## Hot take
 
 I built five agentic safeguards on top of the base model — a reproduction tool, a
@@ -322,6 +408,10 @@ docker build -t slopgate-sandbox:v1 .
 python -m slopgate.sandbox.selftest      # sandbox discriminates versions
 python -m slopgate.corpus.build          # 15 injected cases
 python -m slopgate.eval.harness          # baseline vs solution, all stages
+python -m slopgate.reach.eval            # v3 R1: reachability, 0 soundness violations
+python -m slopgate.reach.eval_scale      # v3 R1 at scale: 4000 real files, no network
+python -m slopgate.slop.eval             # v3 R2: name-slop FP rate (needs network)
+python -m slopgate.slop.eval_scale       # v3 R2 at scale: live PyPI FP/recall
 ```
 
 Host code is Python **stdlib-only** (no `pip install`); the sandbox needs Docker.

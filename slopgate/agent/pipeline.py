@@ -21,6 +21,7 @@ from typing import Optional
 from slopgate.agent.challenge import challenge_confirmation
 from slopgate.agent.gate import apply_fidelity_gate
 from slopgate.agent.threat_model import apply_threat_model_gate
+from slopgate.slop.advisory import apply_slop_advisory
 from slopgate.agent.llm import ask_json
 from slopgate.agent.schema import Claim, ReproEvidence, Report, TriageMemo, Verdict
 from slopgate.agent.triage import run_triage, SYSTEM as TRIAGE_SYSTEM
@@ -165,6 +166,10 @@ def run_pipeline(report: Report, stage: str, trajectory: Trajectory) -> TriageMe
         summary=draft.summary, claims=claims_obj, reproduction=reproduction,
         abstentions=abstentions, challenger_note=challenger_note,
     )
+    # Warn-only R2 name-slop check (real PyPI signals). It records a note and may set
+    # an advisory string, but never touches `verdict` — supply-chain naming is
+    # orthogonal to whether this report reproduces.
+    memo.slop_advisory = apply_slop_advisory(report, trajectory, use_network=True).advisory
     return _finalize(memo, trajectory)
 
 
@@ -207,6 +212,12 @@ def evaluate_all_stages(report: Report, trajectory: Trajectory) -> dict[str, Tri
         if draft.sweep_hit_env else None
     )
 
+    # Warn-only name-slop advisory. In the multi-stage synthetic path we run it
+    # OFFLINE (mimicry-only) so the synthetic corpus incurs no PyPI calls; by design
+    # the name-shape signal alone cannot cross the flag threshold, so this only ever
+    # populates via the realdata path (run_pipeline, network on). Never gates.
+    slop_adv = apply_slop_advisory(report, trajectory, use_network=False).advisory
+
     def base_memo(verdict: Verdict, claims, abstentions, challenger_note="",
                   with_sweep: bool = False) -> TriageMemo:
         abst = list(abstentions)
@@ -217,6 +228,7 @@ def evaluate_all_stages(report: Report, trajectory: Trajectory) -> dict[str, Tri
             affected_version=report.affected_version, verdict=verdict,
             summary=draft.summary, claims=list(claims), reproduction=reproduction,
             abstentions=abst, challenger_note=challenger_note,
+            slop_advisory=slop_adv,
         )
 
     plain_claims = [Claim(text=c) for c in draft.claims]

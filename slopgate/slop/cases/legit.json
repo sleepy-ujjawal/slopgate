@@ -1,0 +1,14 @@
+[
+  {"name": "langchain-chroma", "note": "REAL compound: framework root + vector-db token; the exact shape the naive mimicry vector over-flags"},
+  {"name": "langchain-openai", "note": "REAL first-party langchain integration package"},
+  {"name": "langchain-community", "note": "REAL langchain package"},
+  {"name": "django-redis", "note": "REAL: framework + domain token (redis)"},
+  {"name": "flask-sqlalchemy", "note": "REAL long-established compound extension"},
+  {"name": "fastapi-users", "note": "REAL widely-used auth package on a framework root"},
+  {"name": "pydantic-settings", "note": "REAL first-party pydantic package"},
+  {"name": "celery-redbeat", "note": "REAL celery scheduler extension"},
+  {"name": "flask-jwt-router", "note": "REAL: framework+jwt+router shape but published ~7y ago with provenance — the classifier correctly does NOT flag it (predates the LLM era)"},
+  {"name": "fastapi-auth-middleware", "note": "REAL: framework+auth+middleware shape but a real ~4.5y-old package — correctly not flagged"},
+  {"name": "requests", "note": "REAL plain single-token package (control)"},
+  {"name": "boto3", "note": "REAL plain single-token package (control)"}
+]

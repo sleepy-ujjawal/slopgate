@@ -1,0 +1,12 @@
+[
+  {"name": "langchain-chroma-retriever", "note": "invented: plausible extension of a real integration, not published"},
+  {"name": "pydantic-xml-codec", "note": "invented compound: framework + xml (domain) + codec (utility)"},
+  {"name": "boto3-s3-retry", "note": "invented compound: framework + s3 (domain) + retry (utility)"},
+  {"name": "django-redis-async-cache", "note": "invented compound: framework + redis/async/cache"},
+  {"name": "openai-embedding-cache-client", "note": "invented compound: framework + embedding/cache/client"},
+  {"name": "sqlalchemy-postgres-connector", "note": "invented compound: framework + postgres (domain) + connector (utility)"},
+  {"name": "langchain-pinecone-vector-loader", "note": "invented compound: framework + vector + loader"},
+  {"name": "celery-kafka-adapter", "note": "invented compound: framework + kafka (domain) + adapter (utility)"},
+  {"name": "langchain-chroma-async-retriever", "note": "invented compound: framework + vector-db + async + retriever"},
+  {"name": "pydantic-jwt-oauth-validator", "note": "invented compound: framework + jwt/oauth (domain) + validator (utility)"}
+]

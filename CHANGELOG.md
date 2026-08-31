@@ -40,3 +40,23 @@ the code. For a verification task the highest-leverage move isn't another reason
 layer, it's contact with reality plus the discipline not to answer without it. The
 gate keeps its place not for average-case lift but for the adversarial case: a
 verifier you cannot audit is just another generator.
+
+---
+
+## v3 — two enterprise-review blockers, turned into code
+
+After a day-100 pre-mortem of a proposed enterprise gate, two Sprint-1 blockers were
+built as honest, prototype-scale mechanisms (real static analysis; real live-PyPI).
+
+| Change | What was tried and why | Evidence / result | Decision / learning |
+|---|---|---|---|
+| R1 — fail-closed reachability slicer | The enterprise design's reachability suppression escalated via a **denylist** of dynamic constructs, so an unlisted construct fell through to a signed `not_affected`. Move the soundness bias into the scanner: a **whitelist** of modelable AST nodes; anything else ⇒ `DYNAMIC_AMBIGUOUS`. | Labeled: 12/12, **0 soundness violations** (`unmodeled_match` → AMBIGUOUS, never STRICT). **At scale** (`eval_scale`, 4,000 real files): 0 crashes, **0 soundness violations**, 2,932 referenced symbols all REACHABLE; absent-symbol split 60% STRICT / 40% AMBIGUOUS / 0% falsely reachable. | Kept, standalone + advisory-only. Registry gaps now cost noise, never a false attestation. |
+| R2 — warn-only name-slop classifier | The enterprise slopsquat gate used Levenshtein (typosquatting), not the compound-name AI-hallucination threat, and proposed a synchronous block on an unmeasured threshold. Score the real threat (mimicry + live temporal + provenance); wire it in **warn-only**; measure the FP rate first. | Labeled (live PyPI): **FP 0/12**, recall 10/10. **At scale** (`eval_scale`): **300 real compound packages → 0 FP (0.00%)**, 300 absent hallucination-shaped names → **100% recall**. Caveat: real set is top-PyPI (established), so young legit packages are not stressed — hence warn-only. | Kept as `TriageMemo.slop_advisory`; **never changes the verdict**. Ships warn-only until the FP rate justifies blocking. |
+
+**Learning:** both fixes are the same shape — the enterprise design let a *denylist*
+own a safety decision, so a gap became a silent false negative. The correction in
+each case is to make the *unknown* degrade to the conservative outcome (AMBIGUOUS /
+warn), and to **measure** before acting automatically. Building R2's corpus also
+caught two names I'd assumed were slop but which are real, years-old packages — the
+classifier correctly declined to flag them, and they were relabeled (integrity note
+in `slopgate/slop/cases/`).

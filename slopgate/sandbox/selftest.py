@@ -32,6 +32,8 @@ def main() -> int:
         ok = ok and aff_ok and pat_ok
         print(f"[{status}] {name}: {affected_env}={aff.outcome} | {patched_env}={pat.outcome}")
     ok = _c_runtime_check() and ok
+    ok = _reachability_check() and ok
+    ok = _slop_check() and ok
     if not ok:
         print("\nSelf-test FAILED — the sandbox is not discriminating. "
               "Rebuild: docker build -t slopgate-sandbox:v1 . ; "
@@ -58,6 +60,68 @@ def _c_runtime_check() -> bool:
     good = aff.outcome == "REPRODUCED" and pat.outcome == "NOT_REPRODUCED"
     print(f"[{'PASS' if good else 'FAIL'}] C/ASAN runtime: "
           f"overflow={aff.outcome} | clean={pat.outcome}")
+    return good
+
+
+def _reachability_check() -> bool:
+    """R1: reachable is REACHABLE, unused is STRICT, and — the load-bearing part —
+    an unmodeled construct escalates to AMBIGUOUS instead of a false STRICT."""
+    try:
+        from slopgate.reach.slicer import (
+            AMBIGUOUS, REACHABLE, UNREACHABLE, classify_reachability,
+        )
+    except Exception as exc:  # pragma: no cover
+        print(f"[SKIP] reachability slicer import failed: {exc}")
+        return True
+    checks = [
+        ("direct call", "import gdown\ngdown.download(u)\n", REACHABLE),
+        ("imported-unused", "import gdown\ngdown.extract_id(u)\n", UNREACHABLE),
+        ("getattr dispatch", "import gdown\ngetattr(gdown, n)(u)\n", AMBIGUOUS),
+        # a match statement is not in the modeled-node whitelist (or won't parse on
+        # <3.10): either way it must NOT be suppressed as STRICT.
+        ("unmodeled match",
+         "import gdown\ndef f(k):\n    match k:\n        case 1:\n            return 0\n",
+         AMBIGUOUS),
+    ]
+    good = True
+    for name, src, expected in checks:
+        got = classify_reachability(src, "gdown", "download").classification
+        hit = got == expected
+        good = good and hit
+        print(f"[{'PASS' if hit else 'FAIL'}] reachability {name}: {got}")
+    # the invariant, stated directly: the unmodeled case is never a false STRICT.
+    unmodeled = classify_reachability(
+        "import gdown\ndef f(k):\n    match k:\n        case 1:\n            return 0\n",
+        "gdown", "download").classification
+    if unmodeled == UNREACHABLE:
+        print("[FAIL] reachability soundness: unmodeled construct signed UNREACHABLE_STRICT")
+        good = False
+    return good
+
+
+def _slop_check() -> bool:
+    """R2: deterministic (network-free) classifier logic. A hallucinated compound
+    name that is absent from PyPI flags; a real, established compound name does not;
+    and mimicry-only (no metadata) never crosses the warn threshold."""
+    try:
+        from slopgate.slop.classifier import score_slop
+        from slopgate.slop.pypi import PkgMeta
+    except Exception as exc:  # pragma: no cover
+        print(f"[SKIP] slop classifier import failed: {exc}")
+        return True
+    absent = PkgMeta(name="langchain-jwt-retriever", exists=False)
+    established = PkgMeta(name="django-redis", exists=True,
+                         first_release_iso="2013-01-01T00:00:00Z",
+                         project_urls={"Source": "https://github.com/x/y"})
+    hallucinated = score_slop("langchain-jwt-retriever", absent)
+    legitimate = score_slop("django-redis", established)
+    mimicry_only = score_slop("flask-jwt-router", None)  # offline: no live signal
+    good = (hallucinated.would_flag and not legitimate.would_flag
+            and not mimicry_only.would_flag)
+    print(f"[{'PASS' if good else 'FAIL'}] slop classifier: "
+          f"absent-compound={hallucinated.score:.2f}(flag={hallucinated.would_flag}) | "
+          f"real-compound={legitimate.score:.2f}(flag={legitimate.would_flag}) | "
+          f"offline={mimicry_only.score:.2f}(flag={mimicry_only.would_flag})")
     return good
 
 

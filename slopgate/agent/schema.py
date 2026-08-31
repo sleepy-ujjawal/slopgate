@@ -93,6 +93,7 @@ class TriageMemo:
     reproduction: Optional[ReproEvidence] = None
     abstentions: list[str] = field(default_factory=list)   # what needs a human
     challenger_note: str = ""                               # dissent, if any
+    slop_advisory: str = ""                                 # warn-only name-slop note
     reviewer: str = "PENDING HUMAN REVIEW"                  # never auto-signed
 
     # accounting, filled by the pipeline for the metrics table
