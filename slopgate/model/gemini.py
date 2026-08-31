@@ -24,14 +24,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-# gemini-3.7-flash is the newest flash model but was returning sustained 503
-# (capacity) on this key during the build window, at ~60s per failed attempt.
-# gemini-3.5-flash is thinking-capable, answers in ~10s, and was reliably
-# available, so it is the workhorse. Override with SLOPGATE_MODEL if 3.7 frees up.
-DEFAULT_MODEL = os.environ.get("SLOPGATE_MODEL", "gemini-3.5-flash")
-# Used only when the primary model returns repeated 503/overload. A run that
-# fell back is logged so the reproduction guide can state which model answered.
-FALLBACK_MODEL = "gemini-2.5-flash"
+# The newest 3.x flash models (3.5/3.6/3.7/flash-latest) are preview-tier and,
+# on this key, capacity-rationed: they return sustained 503 "high demand" (or, when
+# they answer, are slow "thinking" models — ~10s on a trivial call). In the same
+# seconds, the mature GA model gemini-2.5-flash answers in ~2s and never 503s, so it
+# is the reliable workhorse. Override with SLOPGATE_MODEL to try a 3.x model when its
+# capacity frees up.
+DEFAULT_MODEL = os.environ.get("SLOPGATE_MODEL", "gemini-2.5-flash")
+# Used when the primary model is unavailable (503/429) OR keeps timing out. A run
+# that fell back is logged so the reproduction guide can state which model answered.
+FALLBACK_MODEL = "gemini-2.5-flash-lite"
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 REQUEST_TIMEOUT_SECONDS = 120
 MAX_RETRIES = 3  # bounded so one bad call can't stall a whole evaluation for minutes
@@ -130,17 +132,21 @@ def generate(
 ) -> GenResult:
     """Call generateContent once and return the text plus usage.
 
-    temperature defaults to 0 for reproducibility across judge reruns. On
-    repeated overload (503) of the primary model, falls back once to
-    FALLBACK_MODEL rather than failing the whole run.
+    temperature defaults to 0 for reproducibility across judge reruns. When the
+    primary model is unavailable (503/429) OR keeps timing out — the exact failure
+    mode of a capacity-rationed, slow "thinking" preview model — it falls back once
+    to FALLBACK_MODEL rather than failing the whole run. Falling back on a timeout
+    (not only a 503) is deliberate: a stalled model must degrade to a fast one, not
+    be retried until the read times out again.
     """
     key = api_key or load_api_key()
     try:
         return _generate_once(prompt, system, json_mode, temperature, model,
                               key, max_output_tokens)
     except GeminiError as exc:
-        overloaded = "HTTP 503" in str(exc) or "HTTP 429" in str(exc)
-        if allow_fallback and overloaded and model != FALLBACK_MODEL:
+        msg = str(exc).lower()
+        degraded = any(s in msg for s in ("http 503", "http 429", "timeout", "timed out"))
+        if allow_fallback and degraded and model != FALLBACK_MODEL:
             return _generate_once(prompt, system, json_mode, temperature,
                                   FALLBACK_MODEL, key, max_output_tokens)
         raise

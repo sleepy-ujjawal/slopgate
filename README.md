@@ -433,6 +433,12 @@ python -m slopgate.slop.eval_scale       # v3 R2 at scale: live PyPI FP/recall
 ```
 
 Host code is Python **stdlib-only** (no `pip install`); the sandbox needs Docker.
-The model is `gemini-3.5-flash` (the newer `gemini-3.7-flash` was returning
-sustained 503s during the build — see `docs/REPRODUCTION.md`; override with
-`SLOPGATE_MODEL`). Cost of a full run is well under $0.05.
+The default model is `gemini-2.5-flash` — the mature GA flash model, which answers
+in ~2s and is reliably available. The newer 3.x flash models (`gemini-3.5/3.6/3.7-
+flash`) are preview-tier and capacity-rationed on a typical key: they return
+sustained 503 "high demand" or, when they answer, are slow "thinking" models
+(~10s on a trivial call), which is what caused read-timeouts in earlier runs. The
+client falls back to `gemini-2.5-flash-lite` on a 503 **or a timeout**. Override the
+default with `SLOPGATE_MODEL` to try a 3.x model when its capacity frees up. Cost of
+a full run is well under $0.05. (The measured tables above were run on
+`gemini-3.5-flash`; re-run on the current default to refresh them.)
