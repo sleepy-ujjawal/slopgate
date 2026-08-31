@@ -18,6 +18,21 @@ _VERDICT_LABEL = {
     Verdict.INSUFFICIENT: "INSUFFICIENT EVIDENCE — needs human review",
 }
 
+# The one line a swamped maintainer actually needs: what do I do with this?
+_VERDICT_ACTION = {
+    Verdict.CONFIRMED:
+        "**What to do:** this reproduced by execution in an isolated sandbox — treat "
+        "it as a real vulnerability and prioritise a fix.",
+    Verdict.NOT_REPRODUCIBLE:
+        "**What to do:** the proof-of-concept did **not** reproduce on the claimed "
+        "version. That is the signature of AI slop — safe to close after a quick "
+        "sanity check of the command below.",
+    Verdict.INSUFFICIENT:
+        "**What to do:** SlopGate could not decide by execution, so it did **not** "
+        "guess — this one **needs your review**. The specific gaps are under "
+        "“What needs your review” below.",
+}
+
 
 def render_markdown(memo: TriageMemo) -> str:
     lines = [
@@ -25,6 +40,8 @@ def render_markdown(memo: TriageMemo) -> str:
         "",
         f"**Package:** {memo.package} {memo.affected_version}  ",
         f"**Verdict:** {_VERDICT_LABEL[memo.verdict]}",
+        "",
+        _VERDICT_ACTION[memo.verdict],
         "",
         "## Assessment",
         memo.summary,
@@ -58,9 +75,12 @@ def render_markdown(memo: TriageMemo) -> str:
         lines += ["## Adversarial review", memo.challenger_note, ""]
 
     if memo.abstentions:
-        lines += ["## Deferred to human reviewer", ""]
+        lines += ["## What needs your review", ""]
         lines += [f"- {a}" for a in memo.abstentions]
         lines.append("")
+
+    if memo.slop_advisory:
+        lines += ["## Supply-chain note (warn-only)", memo.slop_advisory, ""]
 
     lines += [
         "## Sign-off",

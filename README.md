@@ -445,6 +445,22 @@ python -m slopgate.slop.eval             # v3 R2: name-slop FP rate (needs netwo
 python -m slopgate.slop.eval_scale       # v3 R2 at scale: live PyPI FP/recall
 ```
 
+**The maintainer flow — one report in, one memo out:**
+
+```bash
+python -m slopgate.triage realdata/cases/joblib-affected.json   # -> signed memo
+python -m slopgate.eval.realdata_harness                        # baseline vs solution
+python -m slopgate.eval.coverage                                # -> docs/COVERAGE.md
+```
+
+`slopgate.triage` runs the full agent on a single report and prints a memo a
+maintainer can paste into their tracker: a verdict, a plain **“what to do”** line,
+the exact sandbox command and its output, a claim-by-claim assessment, and — when it
+can't decide — a **“what needs your review”** list instead of a guess. The
+[coverage matrix](docs/COVERAGE.md) is generated from the last real run, so the
+public claim of what SlopGate reproduces vs. abstains on can never drift from what was
+actually measured.
+
 Host code is Python **stdlib-only** (no `pip install`); the sandbox needs Docker.
 The default model is `gemini-2.5-flash` — the mature GA flash model, which answers
 in ~2s and is reliably available. The newer 3.x flash models (`gemini-3.5/3.6/3.7-
