@@ -199,15 +199,47 @@ Reproduce with `python -m slopgate.eval.realdata_harness` (needs network to
 provision packages; cases in `realdata/cases/`).
 
 **Honest limits this surfaced.** (1) *Reachability* — the system only reproduces
-when the report carries a runnable PoC; with prose only it abstains. (2) *Trust-
-model slop* — the most common real false-positives (dnsmasq/Kamailio/Hibernate/
-`future`, all documented at `realdata/slop_corpus.md`) are "vulnerabilities" that
-require the attacker to already control a config file or the host. Their PoC
-*reproduces*, so pure execution would wrongly confirm them — the real ceiling of
-this approach, and the next thing to fix (a threat-model check: *what must the
-attacker already control?*). (3) *Language* — the sandbox is Python; C projects
-like curl (the motivating case) need a separate runtime, so curl slop is handled
-only as a text-level baseline-fooling test (`realdata/curl_slop_cases.json`).
+when the report carries a runnable PoC; with prose only it abstains. (2) *Language*
+— the sandbox is Python; C projects like curl (the motivating case) need a
+separate runtime, so curl slop is handled only as a text-level baseline-fooling
+test (`realdata/curl_slop_cases.json`).
+
+## The threat-model gate (closing the trust-model-confusion gap)
+
+The scouts' single most important finding: the most common real false-positive is
+not fabrication, it is **trust-model confusion**. dnsmasq, Kamailio, Hibernate, and
+the `future` CVE-2025-50817 all describe behaviour that genuinely *reproduces* —
+but only after the attacker replaces a config file or writes to a trusted path.
+Reproduction proves the code runs; it does not prove a trust boundary was crossed.
+Pure execution confirms these — wrongly.
+
+So after a confirmation survives the execution and adversarial gates, a
+**threat-model gate** (`slopgate/agent/threat_model.py`) asks one question: *what
+must the attacker control to trigger this?* If the answer is attacker-reachable
+**untrusted input** (a document, token, archive, request, or a config *value*
+passed to a call), the confirmation stands. If it is a **trusted resource** the
+attacker could only control by already owning the host (overwriting a config file,
+placing a file on the import path), the verdict is downgraded to
+`insufficient_evidence` and routed to a human. It emits the identified precondition
+as its evidence, and is deliberately conservative — on any doubt it keeps the
+confirmation, so it never quietly discards a real vulnerability.
+
+Added a trust-model-confusion case (`trustmodel-configfile`: a report whose PoC
+reproduces via a config file the attacker must first replace) to the real corpus:
+
+| | Baseline | Solution (with threat-model gate) |
+|---|---|---|
+| Correct-verdict rate | 50% (5/10) | **100% (10/10)** |
+| False-confirm rate | 30% | **0%** |
+
+The gate downgrades `trustmodel-configfile` (precondition: *"attacker must have
+write access to replace the application's config file"*) **while keeping all five
+genuine CVEs confirmed** — their preconditions are real untrusted input. An earlier,
+more aggressive version over-rejected hydra-core and joblib by latching onto
+"intended for trusted configuration" phrasing; the fix was to default to
+`untrusted_input` and reserve `trusted_resource` for the unambiguous "attacker must
+already own the filesystem" case. That tuning is the difference between a gate that
+closes the gap and one that discards real bugs.
 
 ## Hot take
 

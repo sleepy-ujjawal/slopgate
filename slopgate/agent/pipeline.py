@@ -20,6 +20,7 @@ from typing import Optional
 
 from slopgate.agent.challenge import challenge_confirmation
 from slopgate.agent.gate import apply_fidelity_gate
+from slopgate.agent.threat_model import apply_threat_model_gate
 from slopgate.agent.llm import ask_json
 from slopgate.agent.schema import Claim, ReproEvidence, Report, TriageMemo, Verdict
 from slopgate.agent.triage import run_triage, SYSTEM as TRIAGE_SYSTEM
@@ -121,6 +122,15 @@ def run_pipeline(report: Report, stage: str, trajectory: Trajectory) -> TriageMe
             else:
                 verdict = outcome.verdict
                 abstentions.append("Confirmation revised down after adversarial review.")
+
+    # threat-model gate: a reproduction that requires an attacker-controlled
+    # trusted resource is trust-model confusion, not a vulnerability.
+    if stage == "challenge" and verdict == Verdict.CONFIRMED:
+        tm = apply_threat_model_gate(report, verdict, draft.repro_outcome or "",
+                                     draft.repro_stdout, trajectory)
+        verdict = tm.verdict
+        if tm.note:
+            abstentions.append(tm.note)
 
     reproduction = None
     if draft.env_id:

