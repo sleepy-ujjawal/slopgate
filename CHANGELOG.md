@@ -73,9 +73,15 @@ survived that gate — the other 5 did not reproduce as claimed and were kept ou
 
 | Change | What was tried and why | Evidence / result | Decision / learning |
 |---|---|---|---|
-| Symmetric fidelity gate | The scaled run (18 cases) exposed a false-*dismiss*: `joblib-affected` produced a REPRODUCED artifact on the claimed version yet the verdict came out `not_reproducible` (the LLM verdict call flipping under nondeterminism). The fidelity gate only guarded the *down* direction. Add `apply_reproduction_floor`: if the claimed version reproduced, the verdict can never be `not_reproducible`. | 18-case run: false-confirm **35% → 0%**, accuracy 53% → 82%, reachability 59%. The floor is deterministic and unit-verified (`selftest._floor_check`); it keys on the claimed-version signal (`TriageDraft.reproduced`), not the sweep-inclusive artifact check, so version-shift slop is never wrongly rescued. | Kept. Makes the execution/verdict contract symmetric — never confirm without a run, never dismiss despite one — closing the dangerous direction (waving away a real vuln). |
+| Symmetric fidelity gate | The scaled run exposed a false-*dismiss*: `joblib-affected` produced a REPRODUCED artifact on the claimed version yet the verdict came out `not_reproducible` (the LLM verdict call flipping under nondeterminism). The fidelity gate only guarded the *down* direction. Add `apply_reproduction_floor`: if the claimed version reproduced, the verdict can never be `not_reproducible`. | Clean 18-case run on `gemini-2.5-flash` (all cases completed): false-confirm **28% → 0%**, accuracy **61% → 94%**, reachability 61%. `joblib-affected` now confirms; the lone miss is a *safe* abstention (`curl-telnet-slop`, no PoC → insufficient). The floor is deterministic and unit-verified (`selftest._floor_check`); it keys on the claimed-version signal (`TriageDraft.reproduced`), not the sweep-inclusive artifact check, so version-shift slop is never wrongly rescued. | Kept. Makes the execution/verdict contract symmetric — never confirm without a run, never dismiss despite one — closing the dangerous direction (waving away a real vuln). |
 
 **Learning:** the ground-truth gate is the point, not a formality — 5 of 8 researched
 "real CVEs" did not reproduce as their advisories implied (air-gap-incompatible
 networking, modern-lxml entity blocking, escape payloads that didn't fire, a "fix"
 that changed nothing). A corpus is only as honest as its labels are executable.
+
+**Infra note:** these numbers were produced on `gemini-2.5-flash` (GA). The newer 3.x
+flash models the project first used are capacity-rationed on a typical key — sustained
+503s and slow "thinking" latency that caused read-timeouts and dropped cases — so the
+default model was switched to `gemini-2.5-flash`, with fallback on timeout as well as
+503. Diagnosis: in the same seconds a 3.x model 503'd, the GA model answered in ~2s.
