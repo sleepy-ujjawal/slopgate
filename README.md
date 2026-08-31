@@ -198,6 +198,24 @@ Two cases carry the whole story:
 Reproduce with `python -m slopgate.eval.realdata_harness` (needs network to
 provision packages; cases in `realdata/cases/`).
 
+**Scaled to 8 verified CVEs + the symmetric gate.** The corpus was later expanded to
+8 real CVEs (adding pyyaml CVE-2020-14343, js2py CVE-2024-28397, beaker CVE-2013-7489),
+each **executably verified** by a ground-truth gate — `slopgate/eval/verify_cases.py`
+requires the PoC to reproduce on the affected version and go quiet on the fixed one.
+Only 3 of 8 researched candidates survived that gate; the rest did not reproduce as
+their advisories claimed and were kept out (a corpus is only as honest as its labels
+are executable). On the 18-case run, **false-confirm held at 0%** (baseline 35%),
+accuracy 53% → 82%, reachability 59%.
+
+That run also exposed a false-*dismiss*: `joblib-affected` produced a REPRODUCED
+artifact on the claimed version, yet the verdict flipped to `not_reproducible` under
+model nondeterminism. The fidelity gate only guarded one direction. So the gate is now
+**symmetric** (`slopgate/agent/gate.py::apply_reproduction_floor`): if the claimed
+version reproduced, the verdict can never be `not_reproducible`. It is deterministic
+and self-tested, and keys on the claimed-version signal (not the sweep-inclusive
+artifact check), so version-shift slop is never wrongly rescued — never confirm
+without a run, and never dismiss despite one.
+
 **Honest limits this surfaced.** (1) *Reachability* — the system only reproduces
 when the report carries a runnable PoC; with prose only it abstains. (2) *Language*
 — the sandbox is Python; C projects like curl (the motivating case) need a

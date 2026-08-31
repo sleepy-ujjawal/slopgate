@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from slopgate.agent.challenge import challenge_confirmation
-from slopgate.agent.gate import apply_fidelity_gate
+from slopgate.agent.gate import apply_fidelity_gate, apply_reproduction_floor
 from slopgate.agent.threat_model import apply_threat_model_gate
 from slopgate.slop.advisory import apply_slop_advisory
 from slopgate.agent.llm import ask_json
@@ -83,12 +83,15 @@ def run_pipeline(report: Report, stage: str, trajectory: Trajectory) -> TriageMe
     claims_obj: list[Claim] = [Claim(text=c) for c in draft.claims]
     challenger_note = ""
 
-    # gate (and every stage above it) applies the deterministic fidelity gate
+    # gate (and every stage above it) applies the deterministic fidelity gate,
+    # symmetrically: never confirm without a run, and never dismiss despite one.
     if stage in ("gate", "abstain", "verify", "challenge"):
         gated = apply_fidelity_gate(verdict, trajectory)
         verdict = gated.verdict
         if gated.downgraded:
             abstentions.append(gated.reason)
+        # a REPRODUCED claimed-version run cannot be left 'not_reproducible'
+        verdict = apply_reproduction_floor(verdict, draft.reproduced, trajectory).verdict
 
     # abstain: when no decisive test ran, prefer honest abstention over a guess
     if stage in ("abstain", "verify", "challenge"):
@@ -236,13 +239,15 @@ def evaluate_all_stages(report: Report, trajectory: Trajectory) -> dict[str, Tri
     # tool: agent's proposed verdict, no gate
     out["tool"] = snapshot(base_memo(draft.proposed_verdict, plain_claims, []))
 
-    # gate: deterministic downgrade of unbacked confirmations
+    # gate: deterministic, symmetric — downgrade unbacked confirmations, and
+    # correct up any 'not_reproducible' that contradicts a claimed-version run.
     gated = apply_fidelity_gate(draft.proposed_verdict, trajectory)
+    gate_verdict = apply_reproduction_floor(gated.verdict, draft.reproduced, trajectory).verdict
     gate_abstentions = [gated.reason] if gated.downgraded else []
-    out["gate"] = snapshot(base_memo(gated.verdict, plain_claims, gate_abstentions))
+    out["gate"] = snapshot(base_memo(gate_verdict, plain_claims, gate_abstentions))
 
     # abstain: honest abstention when no decisive test ran
-    verdict = gated.verdict
+    verdict = gate_verdict
     abstentions = list(gate_abstentions)
     if draft.repro_outcome in _INDECISIVE and verdict != Verdict.CONFIRMED:
         verdict = Verdict.INSUFFICIENT

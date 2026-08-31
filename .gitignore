@@ -14,6 +14,8 @@ __pycache__/
 # real-data working files (bulk pulls, provisioning cache, broad exploit dump)
 realdata/envcache/
 realdata/pypicache/
+realdata/cases_candidates/
+realdata/cases_verified/
 realdata/adv1.json
 realdata/adv2.json
 realdata/candidates.json

